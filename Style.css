@@ -1,0 +1,265 @@
+.problem-btn {
+  display: inline-block;
+  padding: 12px 32px;
+  margin: 0 16px;
+  background: #ff7b00;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1em;
+  font-weight: bold;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.problem-btn:hover {
+  background: #ffd700;
+  color: #222;
+}
+/* CUSTOM MARGIN FOR "KEY PROBLEMS" HEADING */
+.key-problems {
+    margin-top: 100px;   /* Change this value to control top margin */
+    margin-bottom: 10px;/* Change this value to control bottom margin */
+    margin-left: 0;     /* Change this value to control left margin */
+    margin-right: 0;    /* Change this value to control right margin */
+    text-align: center; /* You can change alignment if needed */
+}
+body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    background-image: url('IMAGES/Landing Page.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: blur(3px);
+}
+header nav a {
+    color: #fff;
+    text-decoration: none;
+    font-weight: bold;
+    margin: 25px;
+    font-size: 1.1em;
+    transition: color 0.5s;
+}
+
+header nav a:hover {
+    color: #ff7b00;
+}
+body {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    background-image: url('IMAGES/Model Photo 1.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+header {
+    text-align: center;
+    padding: 20px;
+    color: rgb(247, 242, 242);
+    margin-bottom: 1px;
+  width: 100%;
+  background-size: cover;
+  background-position: center;
+}
+
+
+
+/* STYLES FOR THE CONTENT TEXT CONTAINER */
+.Content_Text {
+  max-width: 700px;          /* LIMITS HOW WIDE THE TEXT CAN STRETCH */
+  margin: 1rem auto;         /* ADDS SPACE AROUND AND CENTERS HORIZONTALLY */
+  padding: 1rem;             /* ADDS SPACE INSIDE THE BOX */
+  background: transparent;   /* BACKGROUND COLOR (CAN CHANGE TO RGBA OR HEX) */
+}
+
+/* STYLES FOR THE PARAGRAPH INSIDE THE CONTENT TEXT */
+.Content_Text p {
+  color: #f5f5f5;            /* TEXT COLOR (LIGHT GRAY/WHITE) */
+  font-size: 1.1rem;         /* TEXT SIZE (1REM = ~16PX) */
+  font-family: "Helvetica Neue", Arial, sans-serif; /* FONT STACK (PRIMARY + FALLBACKS) */
+  line-height: 1.6;          /* SPACING BETWEEN LINES */
+  text-align: justify;       /* ALIGNS TEXT TO BOTH LEFT AND RIGHT EDGES */
+  margin: 0;                 /* REMOVES DEFAULT BROWSER MARGINS ON PARAGRAPHS */
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ROW OF 3 EQUALLY SIZED ITEMS */
+.Problem_One_Container {
+  display: flex;
+  gap: 1rem;                 /* SPACE BETWEEN THE THREE */
+  align-items: stretch;      /* MAKE ALL CARDS EQUAL HEIGHT IN THE ROW */
+  justify-content: center;   /* KEEPS THE ROW CENTERED IF IT EVER GETS NARROWER */
+  flex-wrap: nowrap;         /* KEEP THEM ON ONE LINE ON WIDE SCREENS */
+  margin-block: 1.5rem;
+}
+
+/* SHARING ROW DISTRIBUTION */
+.Problem_One_Container .item {
+  flex: 1 1 0;               /* EQUAL WIDTHS, CAN SHRINK IF NEEDED */
+  min-width: 0;              /* PREVENTS OVERFLOW FROM LONG CONTENT */
+  display: flex;             /* THE INNER .CARD CAN STRETCH TO FULL HEIGHT */
+}
+
+/* CARD STYLING */
+.card{
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  background: #000;
+  border: 1px solid #000;
+  border-radius: 12px;
+  padding: .75rem;
+  box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  color: #fff;
+  width: 100%;
+}
+
+/* RESPONSIVE CHART BOX */
+.embed{                       /* WRAPS EACH <IFRAME> CHART */
+  position: relative;         /* FORCES THE BOX TO ALWAYS BE 4:3 PROPORTION, NO MATTER THE SCREEN SIZE. PREVENTS WEIRD SQUISHING. */
+  width: 100%;
+  aspect-ratio: 4 / 3;        /* TYPICAL FRED CHART ASPECT RATIO */
+  overflow: hidden;           /* CUTS OFF ANYTHING OVERFLOWING OUTSIDE THE EMBDED BOX */
+  border-radius: 8px;
+  background: #111;
+}
+.embed iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
+
+.src{ display:block; color:#aaa; font-size:.8rem; }
+
+/* Stack on small screens */
+@media (max-width: 900px){
+  .Problem_One_Container{ flex-wrap: wrap; }
+  .Problem_One_Container .item{ flex: 1 1 100%; }
+}
+
+
+
+
+
+
+
+
+
+
+.Problem_Two_Container {
+  display: flex;             /* put them in a row */
+  gap: 1rem;                 /* space between items */
+  justify-content: center;   /* center the row */
+  align-items: stretch;      /* all equal height */
+}
+
+.Problem_Two_Container .item {
+  flex: 1 1 0;               /* equal widths */
+  display: flex;
+  justify-content: center;   /* center image horizontally */
+  align-items: center;       /* center image vertically */
+  background: #111;          /* optional background */
+  border-radius: 10px;
+  padding: .5rem;
+}
+
+.Problem_Two_Container .item img {
+  max-width: 100%;           /* scale image responsively */
+  max-height: 100%;          /* fit within the item box */
+  border-radius: 8px;        /* optional rounded corners */
+  object-fit: cover;         /* crop neatly instead of stretching */
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ===========================
+   Live Market Pulse Styles
+   =========================== */
+.pulse{
+  padding:4rem 1.25rem;
+  background:transparent;
+  color:#fff;
+  font-family:system-ui, sans-serif;
+}
+.pulse h2{font-size:clamp(1.5rem,2.5vw,2.25rem); margin:0 0 .25rem;}
+.pulse .sub{color:#999; margin:0 0 1.5rem;}
+
+/* Grid */
+.grid{
+  display:grid;
+  gap:1rem;
+  grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+  align-items:stretch;              /* make all cards equal height per row */
+}
+
+/* Card */
+.card{
+  display:flex;                     /* stack title, embed, source */
+  flex-direction:column;
+  gap:.75rem;
+  background:#000;
+  border:1px solid #000;
+  border-radius:16px;
+  padding:1rem;
+  box-shadow:0 6px 18px rgba(0,0,0,.4);
+  color:#fff;
+  height:100%;
+}
+.card h3{margin:.25rem 0 0; font-size:1.25rem; font-weight:600;}
+
+/* Embed box – matches FRED’s 4:3 */
+.embed{
+  position:relative;
+  width:100%;
+  aspect-ratio:4/3;                 /* ~670x500 */
+  border-radius:10px;
+  overflow:hidden;
+  background:#111;
+  flex:0 0 auto;                    /* keep fixed aspect, no stretching */
+}
+.embed iframe,
+.embed img{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  border:0;
+}
+
+/* Source note */
+.src{display:block; color:#aaa; font-size:.8rem; margin-top:auto;}
