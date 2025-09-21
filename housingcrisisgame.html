@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Housing Balance — Mouse-Only Prototype</title>
+<style>
+  /* NOTE: GLOBAL COLOR TOKENS AND BASE TYPOGRAPHY */
+  :root{  /* NOTE: COLOR PALETTE USED ACROSS THE GAME */
+    --bg:#0f172a;        /* slate-950 */
+    --ink:#e2e8f0;       /* slate-200 */
+    --muted:#94a3b8;     /* slate-400 */
+    --good:#34d399;      /* emerald */
+    --warn:#f59e0b;      /* amber */
+    --bad:#ef4444;       /* red */
+    --accent:#60a5fa;    /* blue */
+    --steel:#7dd3fc;     /* sky */
+    --wood:#f59e0b;      /* amber */
+    --concrete:#cbd5e1;  /* slate-300 */
+  }
+  html,body{  /* NOTE: RESET MARGINS AND SET DARK BACKDROP */height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial;}
+  #wrap{  /* NOTE: FLEX CONTAINER THAT HOLDS THE CANVAS */position:fixed;inset:0;display:flex;align-items:stretch;justify-content:stretch}
+  canvas{  /* NOTE: MAIN GAME CANVAS WHERE EVERYTHING IS DRAWN */display:block;flex:1;outline:none;cursor:crosshair}
+  /* HUD */
+  #hud{  /* NOTE: GAME HUD SHOWING RESOURCES AND STATS */
+    position:fixed;left:12px;top:12px;z-index:2;
+    background:rgba(15,23,42,.6);backdrop-filter:saturate(120%) blur(6px);
+    border:1px solid rgba(148,163,184,.25);border-radius:12px;padding:10px 12px;min-width:280px;
+    box-shadow:0 10px 30px rgba(0,0,0,.35)
+  }
+  #hud h1{margin:0 0 6px 0;font-size:14px;letter-spacing:.04em;color:var(--muted);font-weight:600}
+  #stats{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;font-size:13px}
+  #stats .label{color:var(--muted)}
+  #stats .val{font-variant-numeric:tabular-nums}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;background:rgba(148,163,184,.15);border:1px solid rgba(148,163,184,.25)}
+  .dot{width:8px;height:8px;border-radius:50%}
+  .wood .dot{background:var(--wood)} .concrete .dot{background:var(--concrete)} .steel .dot{background:var(--steel)}
+  .good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+  #cta{  /* NOTE: TOP-RIGHT BUTTONS FOR RESET AND SLOW MODE */position:fixed;right:12px;top:12px;z-index:2;display:flex;gap:8px}
+  .btn{
+    padding:10px 14px;border-radius:10px;border:1px solid rgba(148,163,184,.25);background:rgba(2,6,23,.5);
+    color:var(--ink);font-weight:600;letter-spacing:.02em;cursor:pointer;user-select:none
+  }
+  .btn:hover{background:rgba(2,6,23,.75)}
+  /* NOTE: FULL SCREEN STRESS OVERLAY AND FILL BAR */
+  #stressLayer{
+    pointer-events:none;position:fixed;inset:0;z-index:1;
+    overflow:hidden;
+    background:rgba(239,68,68,0.06);
+    transition:background-color .4s ease-out;
+    mix-blend-mode:screen;
+  }
+  #stressFill{
+    position:absolute;inset:0;
+    width:0%;
+    background:linear-gradient(90deg, rgba(239,68,68,0.12) 0%, rgba(239,68,68,0.55) 55%, rgba(153,27,27,0.82) 100%);
+    box-shadow:0 0 160px rgba(239,68,68,0.35);
+    transition:width .45s ease-out;
+  }
+  #toast{
+    position:fixed;left:50%;bottom:16px;transform:translateX(-50%);
+    background:rgba(15,23,42,.85);border:1px solid rgba(148,163,184,.3);border-radius:12px;padding:10px 14px;
+    font-size:13px;color:var(--ink);opacity:0;transition:opacity .3s ease-out;z-index:3
+  }
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="wrap"> <!-- NOTE: PRIMARY GAME AREA WITH CANVAS AND STRESS LAYER -->
+  <canvas id="game" aria-label="Housing Balance Game" tabindex="0"></canvas>
+  <div id="stressLayer" aria-hidden="true"><div id="stressFill"></div></div>
+</div>
+
+<!-- NOTE: HUD PANEL FOR RESOURCE COUNTS AND TIP -->
+<div id="hud" role="region" aria-label="Game status">
+  <h1>HOUSING CRISIS — VISUALIZED</h1>
+  <div id="stats">
+    <div class="label">Inventory</div><div></div>
+    <div class="val">
+      <span class="pill wood" title="Wood"><span class="dot"></span><span id="woodCnt">0</span></span>
+      <span class="pill concrete" title="Concrete"><span class="dot"></span><span id="concreteCnt">0</span></span>
+      <span class="pill steel" title="Steel"><span class="dot"></span><span id="steelCnt">0</span></span>
+    </div>
+    <div class="label">Housed</div><div></div><div class="val"><span id="housedCnt">0</span></div>
+    <div class="label">Waiting</div><div></div><div class="val"><span id="waitingCnt">0</span></div>
+    <div class="label">Spawn Rate</div><div></div><div class="val"><span id="spawnRate">1.5s → faster</span></div>
+    <div class="label">Hint</div><div></div><div class="val">Collect Materials → Build Houses → Bring People Into Homes</div>
+  </div>
+</div>
+
+<!-- NOTE: CONTROL BUTTONS FOR RESETTING GAME OR SLOWING TIME -->
+<div id="cta">
+  <div class="btn" id="resetBtn">Reset</div>
+  <div class="btn" id="slowBtn" title="Accessibility: slow the game pace">Slow Mode</div>
+</div>
+
+<!-- NOTE: TOAST NOTIFICATIONS FOR PLAYER FEEDBACK -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(()=>{
+// NOTE: IIFE WRAPS THE ENTIRE GAME LOGIC SO VARIABLES STAY LOCAL
+// NOTE: HELPER FUNCTIONS FOR RANDOMNESS, CLAMPING, AND DISTANCE
+const rand = (a,b)=>Math.random()*(b-a)+a;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+// NOTE: CACHE IMPORTANT DOM REFERENCES (CANVAS, HUD, STRESS BAR, BUTTONS)
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const hud = {
+  wood: document.getElementById('woodCnt'),
+  concrete: document.getElementById('concreteCnt'),
+  steel: document.getElementById('steelCnt'),
+  housed: document.getElementById('housedCnt'),
+  waiting: document.getElementById('waitingCnt'),
+  spawn: document.getElementById('spawnRate'),
+};
+const stressLayer = document.getElementById('stressLayer');
+const stressFill = document.getElementById('stressFill');
+const toastEl = document.getElementById('toast');
+const resetBtn = document.getElementById('resetBtn');
+const slowBtn = document.getElementById('slowBtn');
+
+let W=innerWidth, H=innerHeight;
+const DPR = clamp(devicePixelRatio||1,1,2);
+
+// NOTE: KEEP THE CANVAS IN SYNC WITH THE WINDOW SIZE
+function resize(){
+  W=innerWidth; H=innerHeight;
+  canvas.width = W*DPR; canvas.height = H*DPR; canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+addEventListener('resize', resize, {passive:true});
+resize();
+
+// ---------- Game State ----------
+// NOTE: SINGLE STATE OBJECT TRACKS EVERYTHING ABOUT THE RUN
+const state = {
+  t:0, dt:0, last:performance.now(),
+  people:[], items:[], houses:[],
+  inventory:{wood:0, concrete:0, steel:0},
+  housed:0,
+  dragging:null, dragOff:{x:0,y:0},
+  placingHouse:false,
+  personSpawnInterval:1500, // ms; shrinks over time
+  lastSpawn:0,
+  gameOver:false,
+  slow:false,
+  stress:0,
+};
+
+// NOTE: COLOR PRESETS FOR DRAWING THE GAME ELEMENTS
+const COLORS = {
+  bg:'#0b1229',
+  ground:'#0b132f',
+  person:'#e2e8f0',
+  impatient:'#f87171',
+  house:'#60a5fa',
+  houseDoor:'#0f172a',
+  steel:'#7dd3fc',
+  wood:'#f59e0b',
+  concrete:'#cbd5e1',
+  outline:'rgba(255,255,255,.12)'
+};
+
+
+// NOTE: UPDATE THE GLOBAL STRESS VALUE AND SYNC THE UI BAR
+function setStress(value){
+  state.stress = clamp(value, 0, 1);
+  const pct = (state.stress * 100).toFixed(1);
+  stressFill.style.width = `${pct}%`;
+  const tint = 0.06 + state.stress * 0.45;
+  stressLayer.style.backgroundColor = `rgba(239,68,68,${Math.min(tint,0.6).toFixed(3)})`;
+}
+
+// NOTE: CONVENIENCE WRAPPER FOR INCREASING OR DECREASING STRESS
+function adjustStress(delta){
+  setStress(state.stress + delta);
+}
+
+const OVERSHOOT = 1.25;
+
+// NOTE: TUNABLE CONSTANTS THAT CONTROL GAME BALANCE
+const LIMITS = {
+  maxPeople: 120,
+  patience: 18000, // ms before turning impatient (visual)
+  failAt: 20,      // waiting people threshold to show strong stress
+  spawnMin: 550,   // minimum spawn interval
+  houseCapacity: 4,
+  itemTTL: 12000,
+  itemSpawnEvery: 1200,
+  itemMax: 12
+};
+
+// ---------- Entities ----------
+// NOTE: SPAWN RESOURCE PICKUPS IF WE HAVE ROOM FOR THEM
+// NOTE: SPAWN RESOURCE PICKUPS IF WE HAVE ROOM FOR THEM
+function spawnItem(){
+  if(state.items.length>=LIMITS.itemMax) return;
+  const types=['wood','concrete','steel'];
+  const type = types[(Math.random()*types.length)|0];
+  const m=64;
+  state.items.push({
+    id:crypto.randomUUID(), type,
+    x: rand(m,W-m), y: rand(m,H*0.65),
+    ttl: LIMITS.itemTTL
+  });
+}
+
+// NOTE: SPAWN PEOPLE FROM LEFT OR RIGHT EDGES AND GIVE THEM MOTION
+// NOTE: SPAWN PEOPLE FROM LEFT OR RIGHT EDGES AND GIVE THEM MOTION
+function spawnPerson(){
+  const edge = Math.random()<0.5?'left':'right';
+  const y = rand(H*0.15,H*0.85);
+  const x = (edge==='left')? -20 : W+20;
+  state.people.push({
+    id:crypto.randomUUID(),
+    x,y, r:10,
+    vx: (edge==='left')? rand(0.35,0.8): rand(-0.8,-0.35),
+    vy: rand(-0.2,0.2),
+    housed:false,
+    tBorn: state.t,
+    impatient:false
+  });
+}
+
+// NOTE: CONSUME RESOURCES AND PLACE A NEW HOUSE ON THE MAP
+// NOTE: CONSUME RESOURCES AND PLACE A NEW HOUSE ON THE MAP
+function placeHouseAt(x,y){
+  state.houses.push({
+    id:crypto.randomUUID(),
+    x,y, w:60,h:56, cap: LIMITS.houseCapacity, inside:0
+  });
+  state.placingHouse=false;
+  notify('House built (+4 capacity)');
+}
+
+// NOTE: WHEN INVENTORY HAS FULL SET, ALLOW HOUSE PLACEMENT
+// NOTE: WHEN INVENTORY HAS FULL SET, ALLOW HOUSE PLACEMENT
+function craftCheck(){
+  const inv=state.inventory;
+  if(inv.wood>=1 && inv.concrete>=1 && inv.steel>=1){
+    inv.wood--; inv.concrete--; inv.steel--;
+    state.placingHouse=true;
+    notify('Click to place your house');
+  }
+}
+
+// ---------- Input ----------
+// NOTE: TRACK MOUSE/TAP POSITION FOR DRAGGING AND PLACEMENT
+const pointer = {x:W/2,y:H/2, down:false};
+canvas.addEventListener('mousemove', e=>{
+  const rect=canvas.getBoundingClientRect();
+  pointer.x = e.clientX-rect.left;
+  pointer.y = e.clientY-rect.top;
+  if(state.dragging){
+    state.dragging.x = pointer.x + state.dragOff.x;
+    state.dragging.y = pointer.y + state.dragOff.y;
+  }
+},{passive:true});
+
+canvas.addEventListener('mousedown', e=>{
+  pointer.down=true;
+  if(state.gameOver) return;
+  // If placing house, place where clicked (but avoid edges)
+  if(state.placingHouse){
+    const m=50;
+    const x=clamp(pointer.x,m,W-m), y=clamp(pointer.y,H*0.25,H*0.9-m);
+    placeHouseAt(x,y);
+    return;
+  }
+  // Try grab a person (priority)
+  for(let i=state.people.length-1;i>=0;i--){
+    const p=state.people[i];
+    if(p.housed) continue;
+    if(Math.hypot(pointer.x-p.x, pointer.y-p.y) <= p.r+4){
+      state.dragging=p;
+      state.dragOff.x = p.x-pointer.x;
+      state.dragOff.y = p.y-pointer.y;
+      return;
+    }
+  }
+  // Otherwise, click item to collect
+  for(let i=state.items.length-1;i>=0;i--){
+    const it=state.items[i];
+    if(Math.abs(pointer.x-it.x)<=18 && Math.abs(pointer.y-it.y)<=18){
+      state.items.splice(i,1);
+      state.inventory[it.type]++;
+      updateHUD();
+      craftCheck();
+      return;
+    }
+  }
+});
+
+// NOTE: FINISH DRAGGING AND HOUSE PEOPLE WHEN APPROPRIATE
+addEventListener('mouseup', ()=>{
+  pointer.down=false;
+  if(state.dragging){
+    // drop person: if over a house with space, house them
+    const p=state.dragging; state.dragging=null;
+    const house = state.houses.find(h=>(
+      pointer.x > h.x-h.w/2 && pointer.x < h.x+h.w/2 &&
+      pointer.y > h.y-h.h && pointer.y < h.y
+    ));
+    if(house && house.inside < house.cap){
+      house.inside++;
+      p.housed=true;
+      state.housed++;
+      notify('Housed +1');
+      updateHUD();
+      // NOTE: HOUSING SOMEONE RELIEVES STRESS A BIT
+      adjustStress(-0.1);
+    }
+  }
+},{passive:true});
+
+// Buttons
+// NOTE: BUTTON HANDLERS FOR RESET AND TOGGLE SLOW MODE
+resetBtn.addEventListener('click', ()=>reset());
+slowBtn.addEventListener('click', ()=>{
+  state.slow = !state.slow;
+  slowBtn.textContent = state.slow? 'Normal Mode' : 'Slow Mode';
+  notify(state.slow? 'Slow mode ON' : 'Slow mode OFF');
+});
+
+// ---------- Loop ----------
+// NOTE: MAIN GAME LOOP (TIMING, SPAWNS, AI, STRESS)
+function update(now){
+  state.dt = now - state.last; state.last = now; state.t += state.dt;
+  const scale = state.slow? 0.55 : 1;
+
+  // Spawn items
+  if(state.t % (LIMITS.itemSpawnEvery/scale) < state.dt){
+    spawnItem();
+  }
+  // Spawn people faster over time
+  if(now - state.lastSpawn > state.personSpawnInterval/scale){
+    spawnPerson();
+    state.lastSpawn = now;
+    state.personSpawnInterval = Math.max(LIMITS.spawnMin, state.personSpawnInterval - (6*scale)); // ramps difficulty
+    hud.spawn.textContent = (state.personSpawnInterval/1000).toFixed(1)+'s → faster';
+  }
+
+  // Move people (not dragged)
+  for(const p of state.people){
+    if(p.housed) continue;
+    if(state.dragging===p) continue;
+    // Walk
+    p.x += p.vx * scale * (1 + Math.random()*0.2);
+    p.y += p.vy * scale;
+    // Bounce a bit vertically
+    if(p.y< H*0.18 || p.y> H*0.9) p.vy*=-1;
+    // Seek nearest house if any with space
+    const target = nearestHouseWithSpace(p);
+    if(target){
+      const tx = clamp(target.x, 0, W), ty = clamp(target.y-20, 0, H);
+      const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx,dy)||1;
+      const speed = 0.35*scale;
+      p.x += (dx/d)*speed; p.y += (dy/d)*speed;
+    }
+    // mark impatient
+    if(!p.impatient && (state.t - p.tBorn) > LIMITS.patience/ (state.slow?0.7:1)){
+      p.impatient = true;
+    }
+  }
+
+  // Cull far offscreen people (fail state if too many waiting)
+  const waiting = state.people.filter(p=>!p.housed).length;
+  hud.waiting.textContent = waiting;
+
+  // NOTE: USE ELAPSED TIME SO STRESS GROWTH IS FRAME RATE INDEPENDENT
+  const dtSec = state.dt / 1000;
+  if (waiting > 0 && !state.gameOver) {
+    const pressure = waiting / LIMITS.failAt;
+    const gainRate = state.slow ? 0.05 : 0.1;
+    adjustStress(pressure * gainRate * dtSec);
+  }
+  if(waiting > LIMITS.maxPeople && !state.gameOver){
+    gameOver();
+  }
+
+  // Items TTL
+  for(let i=state.items.length-1;i>=0;i--){
+    state.items[i].ttl -= state.dt*scale;
+    if(state.items[i].ttl<=0) state.items.splice(i,1);
+  }
+}
+
+// NOTE: RENDER EVERYTHING ON THE CANVAS FOR CURRENT FRAME
+function draw(){
+  // bg
+  ctx.clearRect(0,0,W,H);
+  // ground gradient
+  const g = ctx.createLinearGradient(0,H*0.2,0,H);
+  g.addColorStop(0, '#0b142f'); g.addColorStop(1, COLORS.ground);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  // Houses
+  for(const h of state.houses){
+    drawHouse(h);
+  }
+
+  // Items
+  for(const it of state.items){
+    drawItem(it);
+  }
+
+  // People
+  for(const p of state.people){
+    drawPerson(p);
+  }
+
+  // House ghost (placement)
+  if(state.placingHouse){
+    drawHouseGhost(pointer.x, pointer.y);
+  }
+
+  // Drag hint
+  if(state.dragging){
+    ctx.save();
+    ctx.strokeStyle='rgba(96,165,250,.8)';
+    ctx.setLineDash([6,6]);
+    ctx.lineWidth=2;
+    ctx.strokeRect(pointer.x-24, pointer.y-24, 48, 48);
+    ctx.restore();
+  }
+}
+
+// NOTE: MASTER FRAME FUNCTION THAT UPDATES THEN DRAWS EACH TICK
+function frame(now){
+  update(now);
+  draw();
+  requestAnimationFrame(frame);
+// NOTE: START THE FRAME LOOP
+requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---------- Rendering ----------
+// NOTE: VISUAL REPRESENTATION OF RESOURCE PICKUPS
+function drawItem(it){
+  ctx.save();
+  ctx.translate(it.x, it.y);
+  // base
+  ctx.globalAlpha = 0.95;
+  ctx.strokeStyle = 'rgba(255,255,255,.15)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0,0,18,0,Math.PI*2); ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // glyph
+  if(it.type==='wood'){
+    ctx.fillStyle = COLORS.wood;
+    ctx.rotate(0.2);
+    ctx.fillRect(-12,-5,24,10);
+    ctx.strokeStyle='rgba(0,0,0,.2)'; ctx.strokeRect(-12,-5,24,10);
+  } else if(it.type==='concrete'){
+    ctx.fillStyle = COLORS.concrete;
+    ctx.fillRect(-12,-12,24,24);
+    ctx.strokeStyle='rgba(0,0,0,.2)'; ctx.strokeRect(-12,-12,24,24);
+  } else {
+    ctx.fillStyle = COLORS.steel;
+    ctx.beginPath();
+    ctx.moveTo(0,-14); ctx.lineTo(12,12); ctx.lineTo(-12,12); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// NOTE: DRAW EACH PERSON WITH SIMPLE BODY SHAPES
+function drawPerson(p){
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, p.r+10, 14,6,0,0,Math.PI*2); ctx.fill();
+
+  // body
+  ctx.fillStyle = p.impatient ? COLORS.impatient : COLORS.person;
+  ctx.beginPath();
+  ctx.arc(0,-p.r-6, 6, 0, Math.PI*2); // head
+  ctx.fill();
+  ctx.fillRect(-5,-p.r, 10, 18);      // torso
+  // legs
+  ctx.fillRect(-7, 6, 5, 10);
+  ctx.fillRect( 2, 6, 5, 10);
+  // outline when draggable
+  ctx.strokeStyle = 'rgba(255,255,255,.12)';
+  ctx.strokeRect(-12,-p.r-10,24,28);
+  ctx.restore();
+}
+
+// NOTE: DRAW A HOUSE WITH CAPACITY PIPS
+function drawHouse(h){
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  // body
+  ctx.fillStyle=COLORS.house;
+  roundRect(-h.w/2, -h.h, h.w, h.h-8, 8, true, false);
+  // roof
+  ctx.fillStyle='#3b82f6';
+  ctx.beginPath();
+  ctx.moveTo(-h.w/2-4, -h.h+12);
+  ctx.lineTo(0, -h.h-14);
+  ctx.lineTo(h.w/2+4, -h.h+12);
+  ctx.closePath(); ctx.fill();
+  // door
+  ctx.fillStyle=COLORS.houseDoor;
+  ctx.fillRect(-10,-22,20,22);
+  // capacity pips
+  for(let i=0;i<h.cap;i++){
+    const filled = i < h.inside;
+    ctx.fillStyle = filled? '#22c55e' : 'rgba(255,255,255,.25)';
+    ctx.beginPath(); ctx.arc(-h.w/2 + 12 + i*12, -h.h-22, 4, 0, Math.PI*2); ctx.fill();
+  }
+  // stroke
+  ctx.strokeStyle='rgba(255,255,255,.15)';
+  ctx.lineWidth=2; ctx.strokeRect(-h.w/2, -h.h, h.w, h.h-8);
+  ctx.restore();
+}
+// NOTE: PREVIEW HOUSE WHEN PLAYER IS ABOUT TO PLACE ONE
+function drawHouseGhost(x,y){
+  const w=60,h=56;
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.globalAlpha=0.5;
+  ctx.fillStyle='#60a5fa';
+  roundRect(-w/2, -h, w, h-8, 8, true, false);
+  ctx.fillStyle='#3b82f6';
+  ctx.beginPath(); ctx.moveTo(-w/2-4,-h+12); ctx.lineTo(0,-h-14); ctx.lineTo(w/2+4,-h+12); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+// NOTE: UTILITY TO DRAW ROUNDED RECTANGLES
+function roundRect(x,y,w,h,r,fill,stroke){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  if(fill) ctx.fill(); if(stroke) ctx.stroke();
+}
+
+// NOTE: FIND CLOSEST HOUSE WITH FREE BEDS FOR A PERSON
+function nearestHouseWithSpace(p){
+  let best=null, bestD=1e9;
+  for(const h of state.houses){
+    if(h.inside>=h.cap) continue;
+    const d = Math.hypot(p.x-h.x, p.y-(h.y-20));
+    if(d<bestD){bestD=d; best=h;}
+  }
+  return best;
+}
+
+// ---------- HUD / UX ----------
+// NOTE: REFRESH HUD COUNTS SO PLAYER SEES CURRENT STATUS
+function updateHUD(){
+  hud.wood.textContent = state.inventory.wood;
+  hud.concrete.textContent = state.inventory.concrete;
+  hud.steel.textContent = state.inventory.steel;
+  hud.housed.textContent = state.housed;
+}
+
+let toastTimer=null;
+// NOTE: PUSH A TEMPORARY TOAST MESSAGE TO THE PLAYER
+function notify(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>toastEl.classList.remove('show'), 1400);
+}
+
+// NOTE: GAME ENDS WHEN TOO MANY WAITING PEOPLE ACCUMULATE
+function gameOver(){
+  state.gameOver=true;
+  notify('Game over—too many waiting. Click Reset to try again.');
+}
+
+// NOTE: RESET RETURNS EVERYTHING TO INITIAL VALUES AND ZEROES STRESS
+function reset(){
+  Object.assign(state, {
+    ...state,
+    t:0, dt:0, last:performance.now(),
+    people:[], items:[], houses:[],
+    inventory:{wood:0, concrete:0, steel:0},
+    housed:0, dragging:null, placingHouse:false,
+    personSpawnInterval:1500, lastSpawn:0, gameOver:false,
+    stress:0
+  });
+  updateHUD();
+  // NOTE: CLEAR THE STRESS BAR WHEN STARTING OVER
+  setStress(0);
+  notify('Reset');
+}
+reset();
+
+})();</script>
+</body>
+</html>
