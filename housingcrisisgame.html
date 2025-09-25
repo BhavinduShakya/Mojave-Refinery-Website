@@ -3,10 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Housing Balance — Mouse-Only Prototype</title>
+<title>HOUSING CRISIS SIMULATION</title>
 <style>
-  /* NOTE: GLOBAL COLOR TOKENS AND BASE TYPOGRAPHY */
-  :root{  /* NOTE: COLOR PALETTE USED ACROSS THE GAME */
+  :root{
     --bg:#0f172a;        /* slate-950 */
     --ink:#e2e8f0;       /* slate-200 */
     --muted:#94a3b8;     /* slate-400 */
@@ -18,11 +17,11 @@
     --wood:#f59e0b;      /* amber */
     --concrete:#cbd5e1;  /* slate-300 */
   }
-  html,body{  /* NOTE: RESET MARGINS AND SET DARK BACKDROP */height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial;}
-  #wrap{  /* NOTE: FLEX CONTAINER THAT HOLDS THE CANVAS */position:fixed;inset:0;display:flex;align-items:stretch;justify-content:stretch}
-  canvas{  /* NOTE: MAIN GAME CANVAS WHERE EVERYTHING IS DRAWN */display:block;flex:1;outline:none;cursor:crosshair}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial;}
+  #wrap{position:fixed;inset:0;display:flex;align-items:stretch;justify-content:stretch}
+  canvas{display:block;flex:1;outline:none;cursor:crosshair;position:relative;z-index:1}
   /* HUD */
-  #hud{  /* NOTE: GAME HUD SHOWING RESOURCES AND STATS */
+  #hud{
     position:fixed;left:12px;top:12px;z-index:2;
     background:rgba(15,23,42,.6);backdrop-filter:saturate(120%) blur(6px);
     border:1px solid rgba(148,163,184,.25);border-radius:12px;padding:10px 12px;min-width:280px;
@@ -36,26 +35,92 @@
   .dot{width:8px;height:8px;border-radius:50%}
   .wood .dot{background:var(--wood)} .concrete .dot{background:var(--concrete)} .steel .dot{background:var(--steel)}
   .good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
-  #cta{  /* NOTE: TOP-RIGHT BUTTONS FOR RESET AND SLOW MODE */position:fixed;right:12px;top:12px;z-index:2;display:flex;gap:8px}
+  #cta{position:fixed;right:12px;top:12px;z-index:2;display:flex;gap:8px}
   .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
     padding:10px 14px;border-radius:10px;border:1px solid rgba(148,163,184,.25);background:rgba(2,6,23,.5);
-    color:var(--ink);font-weight:600;letter-spacing:.02em;cursor:pointer;user-select:none
+    color:var(--ink);font-weight:600;letter-spacing:.02em;cursor:pointer;user-select:none;text-decoration:none
   }
+  button.btn{font:inherit;}
   .btn:hover{background:rgba(2,6,23,.75)}
-  /* NOTE: FULL SCREEN STRESS OVERLAY AND FILL BAR */
-  #stressLayer{
-    pointer-events:none;position:fixed;inset:0;z-index:1;
-    overflow:hidden;
-    background:rgba(239,68,68,0.06);
-    transition:background-color .4s ease-out;
-    mix-blend-mode:screen;
+  /* Stress meter overlay */
+  #stress{
+    pointer-events:none;position:fixed;inset:0;z-index:0;overflow:hidden;
+    background:rgba(15,23,42,.1);
   }
-  #stressFill{
-    position:absolute;inset:0;
-    width:0%;
-    background:linear-gradient(90deg, rgba(239,68,68,0.12) 0%, rgba(239,68,68,0.55) 55%, rgba(153,27,27,0.82) 100%);
-    box-shadow:0 0 160px rgba(239,68,68,0.35);
-    transition:width .45s ease-out;
+  #stress .stress-fill{
+    position:absolute;inset:0;transform-origin:left center;transform:scaleX(0);
+    background:linear-gradient(90deg, rgba(147,197,253,.35), rgba(239,68,68,.9));
+    opacity:.75;mix-blend-mode:screen;transition:filter .25s ease, opacity .25s ease;
+  }
+  #stress.is-warning .stress-fill{
+    background:linear-gradient(90deg, rgba(251,191,36,.45), rgba(239,68,68,.95));
+    opacity:.85;
+  }
+  #stress.is-danger .stress-fill{
+    background:linear-gradient(90deg, rgba(248,113,113,.6), rgba(239,68,68,1));
+    animation:stressFlash .5s steps(2,start) infinite;
+    opacity:1;
+  }
+  @keyframes stressFlash{
+    0%,100%{filter:brightness(1);}
+    50%{filter:brightness(1.75);}
+  }
+  #introOverlay{
+    position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;
+    padding:24px;background:rgba(15,23,42,.9);backdrop-filter:blur(12px);
+    transition:opacity .3s ease;
+  }
+  #introOverlay.hidden{opacity:0;pointer-events:none;}
+  #introOverlay .panel{
+    background:rgba(15,23,42,.92);border:1px solid rgba(148,163,184,.35);border-radius:18px;
+    padding:32px 34px;max-width:420px;text-align:left;box-shadow:0 18px 40px rgba(0,0,0,.45);
+  }
+  #introOverlay h2{margin:0 0 14px;font-size:22px;letter-spacing:.03em;text-align:center;}
+  #introOverlay p{margin:0 0 16px;font-size:15px;line-height:1.6;color:var(--muted);text-align:center;}
+  #introOverlay ul{margin:0 0 20px;padding:0;list-style:none;font-size:14px;line-height:1.55;color:var(--muted);}
+  #introOverlay ul li{display:flex;gap:10px;margin-bottom:10px;}
+  #introOverlay ul li::before{content:'*';color:var(--accent);margin-top:1px;font-size:18px;line-height:1;}
+  #introOverlay .actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;}
+  #introOverlay .actions .btn{min-width:140px;}
+
+  #gameOverOverlay{
+    position:fixed;inset:0;z-index:4;display:flex;align-items:center;justify-content:center;
+    padding:24px;background:rgba(15,23,42,.9);backdrop-filter:blur(10px);
+    opacity:0;pointer-events:none;transition:opacity .3s ease;
+  }
+  #gameOverOverlay.show{
+    opacity:1;pointer-events:auto;
+  }
+  #gameOverOverlay .panel{
+    background:rgba(15,23,42,.92);border:1px solid rgba(148,163,184,.35);border-radius:16px;
+    padding:26px 28px;max-width:360px;text-align:center;box-shadow:0 18px 40px rgba(0,0,0,.45);
+  }
+  #gameOverOverlay .panel h2{
+    margin:0 0 12px;font-size:20px;letter-spacing:.02em;
+  }
+  #gameOverOverlay .panel p{
+    margin:0 0 22px;font-size:14px;line-height:1.5;color:var(--muted);
+  }
+  #gameOverOverlay .scorecard{
+    display:grid;grid-template-columns:auto auto;gap:8px 16px;justify-content:center;
+    margin:0 0 18px;font-size:15px;
+  }
+  #gameOverOverlay .scorecard .label{color:var(--muted);text-align:right;text-transform:uppercase;letter-spacing:.05em;font-size:12px;}
+  #gameOverOverlay .scorecard .value{color:var(--ink);font-weight:600;font-size:16px;}
+  #gameOverOverlay .score-total{
+    font-size:18px;font-weight:700;margin:0 0 24px;color:var(--good);text-transform:uppercase;letter-spacing:.06em;
+  }
+  #gameOverOverlay .score-total.score-neutral{color:var(--muted);}
+  #gameOverOverlay .score-total.score-bad{color:var(--bad);}
+  #gameOverOverlay .actions{
+    display:flex;gap:10px;flex-wrap:wrap;justify-content:center;
+  }
+  #gameOverOverlay .actions .btn{
+    min-width:120px;
+  }
+  #gameOverOverlay .actions .btn.alt{
+    background:rgba(2,6,23,.35);border-color:rgba(148,163,184,.45);
   }
   #toast{
     position:fixed;left:50%;bottom:16px;transform:translateX(-50%);
@@ -66,14 +131,15 @@
 </style>
 </head>
 <body>
-<div id="wrap"> <!-- NOTE: PRIMARY GAME AREA WITH CANVAS AND STRESS LAYER -->
+<div id="wrap">
   <canvas id="game" aria-label="Housing Balance Game" tabindex="0"></canvas>
-  <div id="stressLayer" aria-hidden="true"><div id="stressFill"></div></div>
+  <div id="stress" aria-hidden="true">
+    <div class="stress-fill"></div>
+  </div>
 </div>
 
-<!-- NOTE: HUD PANEL FOR RESOURCE COUNTS AND TIP -->
 <div id="hud" role="region" aria-label="Game status">
-  <h1>HOUSING CRISIS — VISUALIZED</h1>
+  <h1>HOUSING CRISIS SIMULATION</h1>
   <div id="stats">
     <div class="label">Inventory</div><div></div>
     <div class="val">
@@ -83,29 +149,60 @@
     </div>
     <div class="label">Housed</div><div></div><div class="val"><span id="housedCnt">0</span></div>
     <div class="label">Waiting</div><div></div><div class="val"><span id="waitingCnt">0</span></div>
-    <div class="label">Spawn Rate</div><div></div><div class="val"><span id="spawnRate">1.5s → faster</span></div>
-    <div class="label">Hint</div><div></div><div class="val">Collect Materials → Build Houses → Bring People Into Homes</div>
+    <div class="label">Spawn rate</div><div></div><div class="val"><span id="spawnRate">1.5s â†’ faster</span></div>
+    <div class="label">Tip</div><div></div><div class="val">Collect Materials â†’ Build Houses â†’ House People</div>
   </div>
 </div>
 
-<!-- NOTE: CONTROL BUTTONS FOR RESETTING GAME OR SLOWING TIME -->
 <div id="cta">
   <div class="btn" id="resetBtn">Reset</div>
+  <div class="btn" id="pauseBtn">Pause</div>
   <div class="btn" id="slowBtn" title="Accessibility: slow the game pace">Slow Mode</div>
 </div>
 
-<!-- NOTE: TOAST NOTIFICATIONS FOR PLAYER FEEDBACK -->
+<div id="introOverlay" role="dialog" aria-modal="true">
+  <div class="panel">
+    <h2>Welcome to the Housing Crisis Simulation</h2>
+    <p>Balance limited materials and time to house as many neighbors as you can.</p>
+    <ul>
+      <li>Click supply drops to gather wood, concrete, and steel.</li>
+      <li>When you hold one of each material, click the map to place a house.</li>
+      <li>Drag waiting neighbors into houses that still have room.</li>
+      <li>Too many unhoused neighbors max out the stress meter and end the run.</li>
+    </ul>
+    <p>Need breathing room? Pause or flip on Slow Mode with the controls in the top right.</p>
+    <div class="actions">
+      <button class="btn" id="startBtn" type="button">Start Game</button>
+    </div>
+  </div>
+</div>
+<div id="gameOverOverlay" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="panel">
+    <h2 id="gameOverTitle">Stress Limit Reached</h2>
+    <p id="gameOverMessage">Stress has overwhelmed the community. What would you like to do?</p>
+    <div class="scorecard" aria-live="polite">
+      <span class="label">People housed</span><span class="value" id="finalHoused">0</span>
+      <span class="label">Waiting unhoused</span><span class="value" id="finalWaiting">0</span>
+    </div>
+    <div class="score-total" id="finalScoreWrap">Final score <span id="finalScore">0</span></div>
+    <div class="actions">
+      <button class="btn" id="resumeBtn" type="button">Resume</button>
+      <button class="btn" id="overlayResetBtn" type="button">Restart</button>
+      <button class="btn" id="overlaySlowBtn" type="button">Slow Mode</button>
+      <a class="btn alt" id="homeBtn" href="index.html">Return Home</a>
+    </div>
+  </div>
+</div>
+
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
 (()=>{
-// NOTE: IIFE WRAPS THE ENTIRE GAME LOGIC SO VARIABLES STAY LOCAL
-// NOTE: HELPER FUNCTIONS FOR RANDOMNESS, CLAMPING, AND DISTANCE
+// ---------- Helpers ----------
 const rand = (a,b)=>Math.random()*(b-a)+a;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
-// NOTE: CACHE IMPORTANT DOM REFERENCES (CANVAS, HUD, STRESS BAR, BUTTONS)
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const hud = {
@@ -116,16 +213,28 @@ const hud = {
   waiting: document.getElementById('waitingCnt'),
   spawn: document.getElementById('spawnRate'),
 };
-const stressLayer = document.getElementById('stressLayer');
-const stressFill = document.getElementById('stressFill');
+const stress = document.getElementById('stress');
+const stressFill = stress.querySelector('.stress-fill');
 const toastEl = document.getElementById('toast');
 const resetBtn = document.getElementById('resetBtn');
+const pauseBtn = document.getElementById('pauseBtn');
 const slowBtn = document.getElementById('slowBtn');
+const gameOverOverlay = document.getElementById('gameOverOverlay');
+const gameOverTitle = document.getElementById('gameOverTitle');
+const gameOverMessage = document.getElementById('gameOverMessage');
+const resumeBtn = document.getElementById('resumeBtn');
+const overlayResetBtn = document.getElementById('overlayResetBtn');
+const overlaySlowBtn = document.getElementById('overlaySlowBtn');
+const finalHoused = document.getElementById('finalHoused');
+const finalWaiting = document.getElementById('finalWaiting');
+const finalScoreWrap = document.getElementById('finalScoreWrap');
+const finalScoreVal = document.getElementById('finalScore');
+const introOverlay = document.getElementById('introOverlay');
+const startBtn = document.getElementById('startBtn');
 
 let W=innerWidth, H=innerHeight;
 const DPR = clamp(devicePixelRatio||1,1,2);
 
-// NOTE: KEEP THE CANVAS IN SYNC WITH THE WINDOW SIZE
 function resize(){
   W=innerWidth; H=innerHeight;
   canvas.width = W*DPR; canvas.height = H*DPR; canvas.style.width=W+'px'; canvas.style.height=H+'px';
@@ -135,7 +244,6 @@ addEventListener('resize', resize, {passive:true});
 resize();
 
 // ---------- Game State ----------
-// NOTE: SINGLE STATE OBJECT TRACKS EVERYTHING ABOUT THE RUN
 const state = {
   t:0, dt:0, last:performance.now(),
   people:[], items:[], houses:[],
@@ -147,10 +255,15 @@ const state = {
   lastSpawn:0,
   gameOver:false,
   slow:false,
-  stress:0,
+  paused:false,
+  started:false,
+  waiting:0,
+  stressLevel:0,
+  stressTarget:0,
+  stressWarning:false,
+  stressDanger:false,
 };
 
-// NOTE: COLOR PRESETS FOR DRAWING THE GAME ELEMENTS
 const COLORS = {
   bg:'#0b1229',
   ground:'#0b132f',
@@ -164,38 +277,26 @@ const COLORS = {
   outline:'rgba(255,255,255,.12)'
 };
 
-
-// NOTE: UPDATE THE GLOBAL STRESS VALUE AND SYNC THE UI BAR
-function setStress(value){
-  state.stress = clamp(value, 0, 1);
-  const pct = (state.stress * 100).toFixed(1);
-  stressFill.style.width = `${pct}%`;
-  const tint = 0.06 + state.stress * 0.45;
-  stressLayer.style.backgroundColor = `rgba(239,68,68,${Math.min(tint,0.6).toFixed(3)})`;
-}
-
-// NOTE: CONVENIENCE WRAPPER FOR INCREASING OR DECREASING STRESS
-function adjustStress(delta){
-  setStress(state.stress + delta);
-}
-
-const OVERSHOOT = 1.25;
-
-// NOTE: TUNABLE CONSTANTS THAT CONTROL GAME BALANCE
 const LIMITS = {
-  maxPeople: 120,
+  maxPeople: 150,
   patience: 18000, // ms before turning impatient (visual)
   failAt: 20,      // waiting people threshold to show strong stress
-  spawnMin: 550,   // minimum spawn interval
-  houseCapacity: 4,
+  spawnMin: 100,   // minimum spawn interval
+  houseCapacity: 5, // people per house
   itemTTL: 12000,
   itemSpawnEvery: 1200,
   itemMax: 12
 };
 
+const STRESS = {
+  warn:0.55,
+  danger:0.85,
+  riseMs:2600,
+  fallMs:1400,
+  gameOver:0.995,
+};
+
 // ---------- Entities ----------
-// NOTE: SPAWN RESOURCE PICKUPS IF WE HAVE ROOM FOR THEM
-// NOTE: SPAWN RESOURCE PICKUPS IF WE HAVE ROOM FOR THEM
 function spawnItem(){
   if(state.items.length>=LIMITS.itemMax) return;
   const types=['wood','concrete','steel'];
@@ -208,8 +309,6 @@ function spawnItem(){
   });
 }
 
-// NOTE: SPAWN PEOPLE FROM LEFT OR RIGHT EDGES AND GIVE THEM MOTION
-// NOTE: SPAWN PEOPLE FROM LEFT OR RIGHT EDGES AND GIVE THEM MOTION
 function spawnPerson(){
   const edge = Math.random()<0.5?'left':'right';
   const y = rand(H*0.15,H*0.85);
@@ -225,8 +324,6 @@ function spawnPerson(){
   });
 }
 
-// NOTE: CONSUME RESOURCES AND PLACE A NEW HOUSE ON THE MAP
-// NOTE: CONSUME RESOURCES AND PLACE A NEW HOUSE ON THE MAP
 function placeHouseAt(x,y){
   state.houses.push({
     id:crypto.randomUUID(),
@@ -236,8 +333,6 @@ function placeHouseAt(x,y){
   notify('House built (+4 capacity)');
 }
 
-// NOTE: WHEN INVENTORY HAS FULL SET, ALLOW HOUSE PLACEMENT
-// NOTE: WHEN INVENTORY HAS FULL SET, ALLOW HOUSE PLACEMENT
 function craftCheck(){
   const inv=state.inventory;
   if(inv.wood>=1 && inv.concrete>=1 && inv.steel>=1){
@@ -248,7 +343,6 @@ function craftCheck(){
 }
 
 // ---------- Input ----------
-// NOTE: TRACK MOUSE/TAP POSITION FOR DRAGGING AND PLACEMENT
 const pointer = {x:W/2,y:H/2, down:false};
 canvas.addEventListener('mousemove', e=>{
   const rect=canvas.getBoundingClientRect();
@@ -294,9 +388,12 @@ canvas.addEventListener('mousedown', e=>{
   }
 });
 
-// NOTE: FINISH DRAGGING AND HOUSE PEOPLE WHEN APPROPRIATE
 addEventListener('mouseup', ()=>{
   pointer.down=false;
+  if(state.gameOver){
+    state.dragging=null;
+    return;
+  }
   if(state.dragging){
     // drop person: if over a house with space, house them
     const p=state.dragging; state.dragging=null;
@@ -310,25 +407,42 @@ addEventListener('mouseup', ()=>{
       state.housed++;
       notify('Housed +1');
       updateHUD();
-      // NOTE: HOUSING SOMEONE RELIEVES STRESS A BIT
-      adjustStress(-0.1);
     }
   }
 },{passive:true});
 
 // Buttons
-// NOTE: BUTTON HANDLERS FOR RESET AND TOGGLE SLOW MODE
 resetBtn.addEventListener('click', ()=>reset());
-slowBtn.addEventListener('click', ()=>{
-  state.slow = !state.slow;
-  slowBtn.textContent = state.slow? 'Normal Mode' : 'Slow Mode';
-  notify(state.slow? 'Slow mode ON' : 'Slow mode OFF');
+pauseBtn.addEventListener('click', ()=>{
+  if(state.gameOver) return;
+  if(!state.started) return;
+  if(state.paused){
+    resumeGame();
+  } else {
+    pauseGame();
+  }
 });
+resumeBtn.addEventListener('click', ()=>resumeGame());
+overlayResetBtn.addEventListener('click', ()=>reset());
+slowBtn.addEventListener('click', ()=>toggleSlowMode());
+overlaySlowBtn.addEventListener('click', ()=>toggleSlowMode());
+if(startBtn){
+  startBtn.addEventListener('click', ()=>{
+    if(state.started) return;
+    hideIntro();
+    state.started = true;
+    state.paused = false;
+    state.last = performance.now();
+    pauseBtn.textContent = 'Pause';
+    canvas.focus({preventScroll:true});
+  });
+}
+updateSlowLabels();
 
 // ---------- Loop ----------
-// NOTE: MAIN GAME LOOP (TIMING, SPAWNS, AI, STRESS)
 function update(now){
   state.dt = now - state.last; state.last = now; state.t += state.dt;
+  if(state.gameOver || state.paused) return;
   const scale = state.slow? 0.55 : 1;
 
   // Spawn items
@@ -340,7 +454,7 @@ function update(now){
     spawnPerson();
     state.lastSpawn = now;
     state.personSpawnInterval = Math.max(LIMITS.spawnMin, state.personSpawnInterval - (6*scale)); // ramps difficulty
-    hud.spawn.textContent = (state.personSpawnInterval/1000).toFixed(1)+'s → faster';
+    hud.spawn.textContent = (state.personSpawnInterval/1000).toFixed(1)+'s â†’ faster';
   }
 
   // Move people (not dragged)
@@ -369,16 +483,34 @@ function update(now){
   // Cull far offscreen people (fail state if too many waiting)
   const waiting = state.people.filter(p=>!p.housed).length;
   hud.waiting.textContent = waiting;
+  state.waiting = waiting;
 
-  // NOTE: USE ELAPSED TIME SO STRESS GROWTH IS FRAME RATE INDEPENDENT
-  const dtSec = state.dt / 1000;
-  if (waiting > 0 && !state.gameOver) {
-    const pressure = waiting / LIMITS.failAt;
-    const gainRate = state.slow ? 0.05 : 0.1;
-    adjustStress(pressure * gainRate * dtSec);
+  state.stressTarget = clamp(waiting / LIMITS.failAt, 0, 1);
+  const rising = state.stressTarget > state.stressLevel;
+  const rate = clamp(state.dt / (rising ? STRESS.riseMs : STRESS.fallMs), 0, 1);
+  state.stressLevel += (state.stressTarget - state.stressLevel) * rate;
+  state.stressLevel = clamp(state.stressLevel, 0, 1);
+
+  const danger = state.stressLevel > STRESS.danger;
+  const warning = state.stressLevel > STRESS.warn && !danger;
+  state.stressDanger = danger;
+  state.stressWarning = warning;
+  stress.classList.toggle('is-warning', warning);
+  stress.classList.toggle('is-danger', danger);
+  stressFill.style.transform = `scaleX(${state.stressLevel})`;
+
+  if(!state.gameOver && state.stressLevel >= STRESS.gameOver){
+    gameOver({
+      title: 'Stress Limit Reached',
+      message: 'Stress has overwhelmed the community. Would you like to try again or return home?',
+    });
   }
+
   if(waiting > LIMITS.maxPeople && !state.gameOver){
-    gameOver();
+    gameOver({
+      title: 'Overwhelmed',
+      message: 'Too many neighbors are waiting for housing. Try balancing inventory and housing placements.',
+    });
   }
 
   // Items TTL
@@ -388,7 +520,22 @@ function update(now){
   }
 }
 
-// NOTE: RENDER EVERYTHING ON THE CANVAS FOR CURRENT FRAME
+function drawStressOverlay(){
+  if(state.stressLevel <= 0.001) return;
+  const width = Math.max(W * state.stressLevel, 1);
+  ctx.save();
+  const gradient = ctx.createLinearGradient(0, 0, width, 0);
+  gradient.addColorStop(0, state.stressDanger ? 'rgba(248,113,113,0.45)' : 'rgba(147,197,253,0.35)');
+  gradient.addColorStop(1, state.stressDanger ? 'rgba(239,68,68,0.95)' : (state.stressWarning ? 'rgba(251,191,36,0.65)' : 'rgba(239,68,68,0.75)'));
+  const baseOpacity = state.stressDanger ? 0.85 : state.stressWarning ? 0.6 : 0.45;
+  const flash = state.stressDanger ? (0.8 + 0.2*Math.sin(state.t / 120)) : 1;
+  ctx.globalAlpha = baseOpacity * flash;
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, H);
+  ctx.restore();
+}
+
 function draw(){
   // bg
   ctx.clearRect(0,0,W,H);
@@ -396,6 +543,8 @@ function draw(){
   const g = ctx.createLinearGradient(0,H*0.2,0,H);
   g.addColorStop(0, '#0b142f'); g.addColorStop(1, COLORS.ground);
   ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+drawStressOverlay();
 
   // Houses
   for(const h of state.houses){
@@ -428,18 +577,14 @@ function draw(){
   }
 }
 
-// NOTE: MASTER FRAME FUNCTION THAT UPDATES THEN DRAWS EACH TICK
 function frame(now){
   update(now);
   draw();
   requestAnimationFrame(frame);
-// NOTE: START THE FRAME LOOP
-requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
 // ---------- Rendering ----------
-// NOTE: VISUAL REPRESENTATION OF RESOURCE PICKUPS
 function drawItem(it){
   ctx.save();
   ctx.translate(it.x, it.y);
@@ -468,7 +613,6 @@ function drawItem(it){
   ctx.restore();
 }
 
-// NOTE: DRAW EACH PERSON WITH SIMPLE BODY SHAPES
 function drawPerson(p){
   ctx.save();
   ctx.translate(p.x, p.y);
@@ -490,7 +634,6 @@ function drawPerson(p){
   ctx.restore();
 }
 
-// NOTE: DRAW A HOUSE WITH CAPACITY PIPS
 function drawHouse(h){
   ctx.save();
   ctx.translate(h.x, h.y);
@@ -518,7 +661,6 @@ function drawHouse(h){
   ctx.lineWidth=2; ctx.strokeRect(-h.w/2, -h.h, h.w, h.h-8);
   ctx.restore();
 }
-// NOTE: PREVIEW HOUSE WHEN PLAYER IS ABOUT TO PLACE ONE
 function drawHouseGhost(x,y){
   const w=60,h=56;
   ctx.save();
@@ -530,7 +672,6 @@ function drawHouseGhost(x,y){
   ctx.beginPath(); ctx.moveTo(-w/2-4,-h+12); ctx.lineTo(0,-h-14); ctx.lineTo(w/2+4,-h+12); ctx.closePath(); ctx.fill();
   ctx.restore();
 }
-// NOTE: UTILITY TO DRAW ROUNDED RECTANGLES
 function roundRect(x,y,w,h,r,fill,stroke){
   ctx.beginPath();
   ctx.moveTo(x+r,y);
@@ -541,7 +682,6 @@ function roundRect(x,y,w,h,r,fill,stroke){
   if(fill) ctx.fill(); if(stroke) ctx.stroke();
 }
 
-// NOTE: FIND CLOSEST HOUSE WITH FREE BEDS FOR A PERSON
 function nearestHouseWithSpace(p){
   let best=null, bestD=1e9;
   for(const h of state.houses){
@@ -553,7 +693,6 @@ function nearestHouseWithSpace(p){
 }
 
 // ---------- HUD / UX ----------
-// NOTE: REFRESH HUD COUNTS SO PLAYER SEES CURRENT STATUS
 function updateHUD(){
   hud.wood.textContent = state.inventory.wood;
   hud.concrete.textContent = state.inventory.concrete;
@@ -562,7 +701,6 @@ function updateHUD(){
 }
 
 let toastTimer=null;
-// NOTE: PUSH A TEMPORARY TOAST MESSAGE TO THE PLAYER
 function notify(msg){
   toastEl.textContent = msg;
   toastEl.classList.add('show');
@@ -570,30 +708,134 @@ function notify(msg){
   toastTimer = setTimeout(()=>toastEl.classList.remove('show'), 1400);
 }
 
-// NOTE: GAME ENDS WHEN TOO MANY WAITING PEOPLE ACCUMULATE
-function gameOver(){
-  state.gameOver=true;
-  notify('Game over—too many waiting. Click Reset to try again.');
+function showIntro(){
+  if(!introOverlay) return;
+  introOverlay.classList.remove('hidden');
+  introOverlay.removeAttribute('aria-hidden');
+  if(startBtn){
+    setTimeout(()=>startBtn.focus({preventScroll:true}), 80);
+  }
 }
 
-// NOTE: RESET RETURNS EVERYTHING TO INITIAL VALUES AND ZEROES STRESS
-function reset(){
+function hideIntro(){
+  if(!introOverlay) return;
+  introOverlay.classList.add('hidden');
+  introOverlay.setAttribute('aria-hidden','true');
+}
+function updateSlowLabels(){
+  const label = state.slow ? 'Normal Mode' : 'Slow Mode';
+  slowBtn.textContent = label;
+  overlaySlowBtn.textContent = label;
+}
+
+function toggleSlowMode(){
+  state.slow = !state.slow;
+  updateSlowLabels();
+  notify(state.slow? 'Slow mode ON' : 'Slow mode OFF');
+}
+
+function updateScoreboard(){
+  const housed = state.housed;
+  const waiting = state.waiting;
+  const score = housed - waiting;
+  finalHoused.textContent = housed;
+  finalWaiting.textContent = waiting;
+  finalScoreVal.textContent = score;
+  finalScoreWrap.classList.remove('score-neutral','score-bad');
+  if(score < 0){
+    finalScoreWrap.classList.add('score-bad');
+  } else if(score === 0){
+    finalScoreWrap.classList.add('score-neutral');
+  }
+  return score;
+}
+
+function openOverlay({mode, title, message}){
+  gameOverTitle.textContent = title;
+  gameOverMessage.textContent = message;
+  resumeBtn.style.display = mode === 'pause' ? 'inline-flex' : 'none';
+  overlayResetBtn.textContent = mode === 'gameOver' ? 'Restart' : 'Reset';
+  updateSlowLabels();
+  gameOverOverlay.classList.add('show');
+  gameOverOverlay.removeAttribute('aria-hidden');
+  const focusTarget = mode === 'pause' ? resumeBtn : overlayResetBtn;
+  if(focusTarget){
+    setTimeout(()=>focusTarget.focus({preventScroll:true}), 80);
+  }
+}
+
+function closeOverlay(){
+  gameOverOverlay.classList.remove('show');
+  gameOverOverlay.setAttribute('aria-hidden','true');
+}
+
+function pauseGame(){
+  if(state.gameOver || state.paused) return;
+  state.paused = true;
+  updateScoreboard();
+  openOverlay({mode:'pause', title:'Paused', message:'Take a breather. Adjust strategy or resume when ready.'});
+  pauseBtn.textContent = 'Resume';
+}
+
+function resumeGame(){
+  if(!state.paused) return;
+  state.paused = false;
+  state.started = true;
+  closeOverlay();
+  pauseBtn.textContent = 'Pause';
+}
+
+function gameOver({title='Game Over', message='Too many neighbors are waiting.'} = {}){
+  if(state.gameOver) return;
+  state.gameOver=true;
+  state.paused=false;
+  pauseBtn.textContent = 'Pause';
+  state.dragging=null;
+  state.placingHouse=false;
+
+  updateScoreboard();
+  notify(title);
+  openOverlay({mode:'gameOver', title, message});
+}
+
+
+// ---------- Reset ----------
+function reset({silent=false, keepPaused=false} = {}){
   Object.assign(state, {
     ...state,
     t:0, dt:0, last:performance.now(),
     people:[], items:[], houses:[],
     inventory:{wood:0, concrete:0, steel:0},
-    housed:0, dragging:null, placingHouse:false,
+    housed:0, dragging:null, dragOff:{x:0,y:0},
+    placingHouse:false,
     personSpawnInterval:1500, lastSpawn:0, gameOver:false,
-    stress:0
+    paused:keepPaused,
+    started:!keepPaused,
+    waiting:0,
+    stressLevel:0, stressTarget:0,
+    stressWarning:false, stressDanger:false
   });
   updateHUD();
-  // NOTE: CLEAR THE STRESS BAR WHEN STARTING OVER
-  setStress(0);
-  notify('Reset');
+  stress.classList.remove('is-warning','is-danger');
+  stressFill.style.transform='scaleX(0)';
+  closeOverlay();
+  pauseBtn.textContent = 'Pause';
+  updateSlowLabels();
+  finalHoused.textContent = '0';
+  finalWaiting.textContent = '0';
+  finalScoreVal.textContent = '0';
+  finalScoreWrap.classList.remove('score-neutral','score-bad');
+  if(!silent){
+    notify('Reset');
+  }
+  if(!keepPaused){
+    hideIntro();
+  }
 }
-reset();
+reset({silent:true, keepPaused:true});
+showIntro();
 
 })();</script>
 </body>
 </html>
+

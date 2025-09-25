@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Housing Mini Game</title>
+
+  <!-- connect CSS sitting in the same folder -->
+  <link rel="stylesheet" href="housing.css" />
+</head>
+<body>
+  <header class="hud">
+    <div class="left">
+      <strong>Housing Mini Game</strong>
+      <span class="hint">Drag families → into houses</span>
+    </div>
+    <div class="stats">
+      <span>Houses Left: <b id="housesLeft">12</b></span>
+      <span>Waiting: <b id="waiting">0</b></span>
+      <span>Time: <b id="time">0s</b></span>
+    </div>
+<!-- STRESS METER -->
+<div class="stress-wrap" aria-label="Stress meter">
+  <div id="stressBar"></div>
+  <span id="stressLabel" class="stress-label">Stress: 0%</span>
+</div>
+  </header>
+
+  <main id="game">
+    <!-- LEFT: people spawn here -->
+    <section class="lane lane-left" id="spawnLane" aria-label="People waiting"></section>
+
+    <!-- RIGHT: houses to fill -->
+    <section class="lane lane-right" aria-label="Available houses">
+      <div id="houses" class="houses-grid"></div>
+    </section>
+
+    <!-- Overlay for end state -->
+    <div id="overlay" class="overlay hidden">
+      <div class="card">
+        <h2>Housing Supply Exhausted</h2>
+        <p>
+          Demand kept rising, but the number of homes didn’t.
+          This is what an affordability crisis feels like!
+        </p>
+        <button id="restartBtn">Play Again</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="foot">
+    Source idea: too many people, not enough homes → affordability crisis.
+  </footer>
+
+  <!-- connect JS sitting in the same folder -->
+<script src="housing.js"></script>
+</body>
+</html>
